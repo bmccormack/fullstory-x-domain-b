@@ -2,10 +2,35 @@
 <head>
   
   <script>
+    // FULLSTORY CROSS-DOMAIN SESSION STITCHING
+    //
+    // This code exists to help "stitch" sessions together across the domain
+    // boundary. The main flow of control happens immediately before and after
+    // the FullStory snippet (see below). You define the the methods that get
+    // executed at those times based on your preferred solution.
     
-    window["_fs_cookie_domain"] = ".bmccormack.github.io"
+    // The cookie domain can be determined programatically, but in some cases
+    // can behave in an odd way. For this example it is hard coded.
+    window["_fs_ss_cookie_domain"] = ".bmccormack.github.io"
+    // These methods define how the FS UID value is passed between sessions. 
+    // There are 3 methods that need to be defined:
+    //  1. _fs_ss_method_look_for_fsuid = Executed before the snippet loads, 
+    //    this method is used to look for an existing FS UID value, meaning a 
+    //    session already exists.
+    //  2. _fs_ss_method_clean_up_fsuid = Executed before the snippet loads,
+    //    this method is used to clean up the FS UID value.
+    //  3. _fs_ss_method_set_fsuid = Executed after the snippet loads,
+    //    this method is used to set the FS UID value so it can be passed
+    //    to new cross-domain pages.
+    window["_fs_ss_method_look_for_fsuid"] = lookForFsUidQueryParam
+    window["_fs_ss_method_clean_up_fsuid"] = cleanUpFsUid
+    window["_fs_ss_method_set_fsuid"] = setFsUid
     
-    //** Cookie helper functions
+    // FULLSTORY CROSS-DOMAIN SESSION STICTCHING HELPER FUNCTIONS
+    //
+    // These methods help with getting and setting cookies and the FS UID data.
+    // These methods should stay the same, regardless of which particular 
+    // solution is implemented.
     function getCookies() {
         var doc = window.document;
         var cookies = {};
@@ -33,9 +58,70 @@
       document.cookie = cname + "=" + cvalue + ";domain=" + encodeURIComponent(domain) + ";" + expires + ";path=/";
     }
     
-    //** end Cookie Helper functions      
+    function getFsUid(){
+        let cookies = getCookies(window.document)
+        if ("fs_uid" in cookies){
+            return cookies["fs_uid"]
+        }
+
+        if ("_fs_uid" in window.localStorage){
+            return window.localStorage["_fs_uid"]
+        }
+
+        return null
+
+    }
     
-    //** parameter helper functions
+    function setFsUidCookieAndLocalStorage(fs_uid) {
+      const cookieExpirationTimeSeconds = 31536000
+      const domain = window["_fs_ss_cookie_domain"]
+      
+      try {
+        setCookie("fs_uid", fs_uid, domain, cookieExpirationTimeSeconds)
+      }
+      catch (ex) {
+        console.log("Exception trying to set cookies: " + ex);
+      }
+        
+      try {
+        window.localStorage.setItem("_fs_uid", fs_uid)
+      }
+      catch (ex) {
+        console.log("Exception trying to set local storage: " + ex);
+      }
+    }        
+    
+    //END FULLSTORY CROSS-DOMAIN SESSION STICTCHING HELPER FUNCTIONS
+    
+    
+    // QUERY PARAMETER SOLUTION FUNCTIONS
+    //
+    // This particular example will use query parameters to pass session
+    // information across the domain boundary. The main solutions are immediately
+    // below with the helper functions in the next sections.
+    
+    function lookForFsUidQueryParam(){
+      try {
+        let fs_uid = getParameterByName("fsuid")
+        
+        return fs_uid
+      }
+      catch (ex){
+        console.log("Exception trying to look for fs_uid query parameter: " + ex)
+      }
+    }    
+    
+    function cleanUpFsUid(){
+      cleanUpURL("fsuid")
+    }
+    
+    function setFsUid(fsUid){
+      appendQueryParamsToLinks("fsuid", fsUid)         
+    }    
+    
+    //END QUERY PARAMETER SOLUTION FUNCTIONS
+    
+    // QUERY PARAMETER SOLUTION HELPER FUNCTIONS
     
     function getParameterByName(name, url = window.location.href) {
       name = name.replace(/[\[\]]/g, '\\$&');
@@ -88,61 +174,21 @@
       
     }
     
-    //** end parameter helper functions
+    //END QUERY PARAMETER SOLUTION HELPER FUNCTIONS
     
-        
 
-    function getFsUid(){
-        let cookies = getCookies(window.document)
-        if ("fs_uid" in cookies){
-            return cookies["fs_uid"]
-        }
-
-        if ("_fs_uid" in window.localStorage){
-            return window.localStorage["_fs_uid"]
-        }
-
-        return null
-
+    
+    // PRE-SNIPPET SESSION STITCHING CODE
+    //
+    // This code must be executed *before* the FullStory snippet executes. We're
+    // looking to see if a session already exists, and if so, we'll set the 
+    // cookie and local storage data to use the existing session. We'll also execute
+    // a method to clean up the fs_uid value that was passed in.
+    let fs_uid = window["_fs_ss_method_look_for_fsuid"]()
+    if (fs_uid){
+      setFsUidCookieAndLocalStorage(fs_uid)
+      window["_fs_ss_method_clean_up_fsuid"]()
     }
-    
-    function setFsUidCookieAndLocalStorage(fs_uid) {
-      const cookieExpirationTimeSeconds = 31536000
-      const domain = window["_fs_cookie_domain"]
-      
-      try {
-        setCookie("fs_uid", fs_uid, domain, cookieExpirationTimeSeconds)
-      }
-      catch (ex) {
-        console.log("Exception trying to set cookies: " + ex);
-      }
-        
-      try {
-        window.localStorage.setItem("_fs_uid", fs_uid)
-      }
-      catch (ex) {
-        console.log("Exception trying to set local storage: " + ex);
-      }
-    }    
-    
-    function lookForFsUidQueryParam(){
-      try {
-        let fs_uid = getParameterByName("fsuid")
-        
-        if (fs_uid){
-          setFsUidCookieAndLocalStorage(fs_uid)
-          cleanUpURL("fsuid")
-        }
-      }
-      catch (ex){
-        console.log("Exception trying to look for fs_uid query parameter: " + ex)
-      }
-    }
-    
-    // if the query parameter exists, we're going to set the cookie
-    // and localStorage values
-    lookForFsUidQueryParam()
-    
     
     window['_fs_debug'] = false;
     window['_fs_host'] = 'fullstory.com';
@@ -167,17 +213,15 @@
         g._v="1.3.0";
     })(window,document,window['_fs_namespace'],'script','user');
 
-
-    
-    window['_fs_ready'] = function() {
-      console.log('writing out the FS ID')
+    // POST-SNIPPET SESSION STITCHING CODE
+    //
+    // Once the snippet runs and the FullStory session is ready (i.e. recording 
+    // has started), we'll execute a method to pass in the FS UID to the next 
+    // session.
+    window['_fs_ready'] = function() {    
       let fsUid = getFsUid()
-      
-      console.log(fsUid)
-      
-      appendQueryParamsToLinks("fsuid", fsUid)      
-      
-    };   
+      window["_fs_ss_method_set_fsuid"](fsUid)
+    };    
     
   </script>
   
