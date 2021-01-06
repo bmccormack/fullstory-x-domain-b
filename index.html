@@ -3,6 +3,147 @@
   
   <script>
     
+    window["_fs_cookie_domain"] = ".bmccormack.github.io"
+    
+    //** Cookie helper functions
+    function getCookies() {
+        var doc = window.document;
+        var cookies = {};
+        try {
+            var parts = doc.cookie.split(';');
+            for (var i = 0; i < parts.length; i++) {
+                var part = parts[i].replace(/^\s+|\s+$/g, ''); // Yuck: Old IEs don't support trim().
+                var kv = part.split('=');
+                if (!cookies[kv[0]]) {
+                    cookies[kv[0]] = kv[1];
+                }
+            }
+        }
+        catch (ex) {
+            // `data:` URLs might throw a SecurityException when accessing the cookie field
+            console.log("Exception trying to parse cookies: " + ex);
+        }
+        return cookies;
+    }
+    
+    function setCookie(cname, cvalue, domain, expirationTimeSeconds) {
+      const nowInSeconds = Math.floor(Date.now() / 1000);
+      var d = new Date((nowInSeconds+expirationTimeSeconds) * 1000);            
+      var expires = "expires="+ d.toUTCString();
+      document.cookie = cname + "=" + cvalue + ";domain=" + encodeURIComponent(domain) + ";" + expires + ";path=/";
+    }
+    
+    //** end Cookie Helper functions      
+    
+    //** parameter helper functions
+    
+    function getParameterByName(name, url = window.location.href) {
+      name = name.replace(/[\[\]]/g, '\\$&');
+      var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+          results = regex.exec(url);
+      if (!results) return null;
+      if (!results[2]) return '';
+      return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+    
+    function removeURLParameter(url, parameter) {
+        //prefer to use l.search if you have a location/link object
+        var urlparts = url.split('?');   
+        if (urlparts.length >= 2) {
+
+            var prefix = encodeURIComponent(parameter) + '=';
+            var pars = urlparts[1].split(/[&;]/g);
+
+            //reverse iteration as may be destructive
+            for (var i = pars.length; i-- > 0;) {    
+                //idiom for string.startsWith
+                if (pars[i].lastIndexOf(prefix, 0) !== -1) {  
+                    pars.splice(i, 1);
+                }
+            }
+
+            return urlparts[0] + (pars.length > 0 ? '?' + pars.join('&') : '');
+        }
+        return url;
+    }
+    
+    function cleanUpURL(parameter) {
+      let newUrl = removeURLParameter(window.document.location.href, parameter)
+      window.history.replaceState({}, document.title, newUrl)
+    }
+    
+    function appendQueryParamsToLinks(param, value) {      
+      let valueEncoded = encodeURIComponent(value)
+      let paramEncoded = encodeURIComponent(param)
+      
+      let elements = document.querySelectorAll('a')
+      for (let i = 0; i < elements.length; i++){
+        let element = elements[i]
+        let href = element.getAttribute("href")
+        if (href) {
+          let newHref = href + "?" + paramEncoded + "=" + valueEncoded
+          element.setAttribute("href",newHref)
+        }
+      }
+      
+    }
+    
+    //** end parameter helper functions
+    
+        
+
+    function getFsUid(){
+        let cookies = getCookies(window.document)
+        if ("fs_uid" in cookies){
+            return cookies["fs_uid"]
+        }
+
+        if ("_fs_uid" in window.localStorage){
+            return window.localStorage["_fs_uid"]
+        }
+
+        return null
+
+    }
+    
+    function setFsUidCookieAndLocalStorage(fs_uid) {
+      const cookieExpirationTimeSeconds = 31536000
+      const domain = window["_fs_cookie_domain"]
+      
+      try {
+        setCookie("fs_uid", fs_uid, domain, cookieExpirationTimeSeconds)
+      }
+      catch (ex) {
+        console.log("Exception trying to set cookies: " + ex);
+      }
+        
+      try {
+        window.localStorage.setItem("_fs_uid", fs_uid)
+      }
+      catch (ex) {
+        console.log("Exception trying to set local storage: " + ex);
+      }
+    }    
+    
+    function lookForFsUidQueryParam(){
+      try {
+        let fs_uid = getParameterByName("fsuid")
+        
+        if (fs_uid){
+          setFsUidCookieAndLocalStorage(fs_uid)
+          cleanUpURL("fsuid")
+        }
+      }
+      catch (ex){
+        console.log("Exception trying to look for fs_uid query parameter: " + ex)
+      }
+    }
+    
+    // if the query parameter exists, we're going to set the cookie
+    // and localStorage values
+    lookForFsUidQueryParam()
+    
+    
     window['_fs_debug'] = false;
     window['_fs_host'] = 'fullstory.com';
     window['_fs_script'] = 'edge.fullstory.com/s/fs.js';
@@ -25,13 +166,33 @@
         if(m[y])m[y]=function(){return g._w[y].apply(this,arguments)};
         g._v="1.3.0";
     })(window,document,window['_fs_namespace'],'script','user');
+
+
+    
+    window['_fs_ready'] = function() {
+      console.log('writing out the FS ID')
+      let fsUid = getFsUid()
+      
+      console.log(fsUid)
+      
+      appendQueryParamsToLinks("fsuid", fsUid)      
+      
+    };   
     
   </script>
   
 </head>
 
 <body>
-<p>Hello World.</p>
+<p>Hello World. This is Site B, hosted on Github Pages</p>
+  
+    <p>
+      Click <a href="/index.html">here</a> to go to the same page.
+    </p>
+    
+    <p>
+      Click <a id="link-to-site-a" href="https://fullstory-x-domain-a.glitch.me/index-URL-rewrite.html">here</a> to go to Site A.
+    </p>  
 </body>
 
 </html>
