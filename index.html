@@ -189,10 +189,14 @@
     // looking to see if a session already exists, and if so, we'll set the 
     // cookie and local storage data to use the existing session. We'll also execute
     // a method to clean up the fs_uid value that was passed in.
-    let fs_uid = window["_fs_ss_method_look_for_fsuid"]()
-    if (fs_uid){
-      setFsUidCookieAndLocalStorage(fs_uid)
-      window["_fs_ss_method_clean_up_fsuid"]()
+    if (typeof window["_fs_ss_method_look_for_fsuid"] === "function") { 
+      let fs_uid = window["_fs_ss_method_look_for_fsuid"]()
+      if (fs_uid){
+        setFsUidCookieAndLocalStorage(fs_uid)
+        if (typeof window["_fs_ss_method_clean_up_fsuid"] === "function"){
+          window["_fs_ss_method_clean_up_fsuid"]()
+        }
+      }
     }
     
     window['_fs_debug'] = false;
@@ -225,8 +229,10 @@
     // session.
     window['_fs_ready'] = function() {    
       let fsUid = getFsUid()
-      window["_fs_ss_method_set_fsuid"](fsUid)
-    };    
+      if (typeof window["_fs_ss_method_set_fsuid"] === "function"){
+        window["_fs_ss_method_set_fsuid"](fsUid)
+      }
+    }
     
   </script>
   
